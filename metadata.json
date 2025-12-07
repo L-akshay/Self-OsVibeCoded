@@ -1,0 +1,9 @@
+{
+  "name": "SELF-OS",
+  "description": "A production-grade AI Operating System integrating Gemini Live, Thinking models, and Knowledge Graphs.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

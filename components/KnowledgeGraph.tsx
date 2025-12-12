@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { X, ExternalLink, Share2, MoreHorizontal, Brain, Activity, Network, ChevronRight } from 'lucide-react';
+import { X, ExternalLink, Share2, MoreHorizontal, Brain, Activity, Network, ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
 import { GraphNode, GraphLink } from '../types';
 import { MOCK_GRAPH_DATA } from '../constants';
 
@@ -158,25 +158,25 @@ export const KnowledgeGraph: React.FC = () => {
   return (
     <div className="w-full h-full relative overflow-hidden bg-navy-950/80 backdrop-blur-sm">
       <div className="absolute top-6 left-6 z-10 pointer-events-none">
-        <h3 className="text-neon-blue font-mono text-[10px] tracking-[0.2em] uppercase border border-neon-blue/30 px-3 py-1.5 rounded bg-navy-900/80 backdrop-blur-md">Semantic Neural Map</h3>
+        <h3 className="text-neon-blue font-mono text-[10px] tracking-[0.2em] uppercase border border-neon-blue/30 px-3 py-1.5 rounded bg-navy-900/80 backdrop-blur-md">My Second Brain</h3>
       </div>
       
       <svg ref={svgRef} className="w-full h-full" />
 
-      {/* Side Panel for Node Details */}
-      <div className={`absolute top-0 right-0 h-full w-80 lg:w-96 bg-navy-900/95 backdrop-blur-xl border-l border-white/10 shadow-[-10px_0_40px_rgba(0,0,0,0.5)] transition-transform duration-300 z-20 flex flex-col ${selectedNode ? 'translate-x-0' : 'translate-x-full'}`}>
+      {/* Side Panel for Node Details - TRANSITION EFFECT */}
+      <div className={`absolute top-0 right-0 h-full w-80 lg:w-96 bg-navy-900/95 backdrop-blur-xl border-l border-white/10 shadow-[-10px_0_40px_rgba(0,0,0,0.5)] transition-all duration-500 z-20 flex flex-col`}>
         
-        {selectedNode && (
+        {selectedNode ? (
           <>
             {/* Panel Header */}
             <div className="p-6 border-b border-white/5 flex items-start justify-between bg-white/5">
-               <div>
+               <div className="animate-in fade-in duration-300">
                  <div className={`text-[10px] font-mono uppercase tracking-widest mb-2 px-2 py-0.5 rounded w-fit ${
                    selectedNode.type === 'PERSON' ? 'text-neon-pink bg-neon-pink/10' :
                    selectedNode.type === 'HABIT' ? 'text-neon-cyan bg-neon-cyan/10' :
                    'text-neon-blue bg-neon-blue/10'
                  }`}>
-                   {selectedNode.type} Node
+                   {selectedNode.type}
                  </div>
                  <h2 className="text-2xl font-light text-white">{selectedNode.label}</h2>
                </div>
@@ -188,31 +188,35 @@ export const KnowledgeGraph: React.FC = () => {
             </div>
 
             {/* Panel Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar animate-in slide-in-from-bottom-4 fade-in duration-500">
                
                {/* Neural Context Section */}
                <div className="space-y-3">
                  <div className="flex items-center gap-2 text-gray-400 text-xs font-mono uppercase tracking-wider">
                    <Brain className="w-4 h-4" />
-                   <span>Neural Context</span>
+                   <span>Why this matters</span>
                  </div>
                  <p className="text-gray-300 text-sm leading-relaxed font-light bg-black/20 p-4 rounded-xl border border-white/5">
-                   {selectedNode.type === 'PERSON' && "A key connection in your professional network. Interaction frequency is trending upwards."}
-                   {selectedNode.type === 'HABIT' && "A reinforced behavior pattern. Consistency score is 87% over the last 30 days."}
-                   {selectedNode.type === 'TOPIC' && "A core knowledge cluster. Contains 12 linked documents and 5 sub-tasks."}
-                   {selectedNode.type === 'CONTENT' && "Structured data entity extracted from recent inputs."}
+                   {selectedNode.description || (
+                     <>
+                        {selectedNode.type === 'PERSON' && "A key connection in your professional network. We talk about this person often."}
+                        {selectedNode.type === 'HABIT' && "A routine you are building. I'm tracking your consistency here."}
+                        {selectedNode.type === 'TOPIC' && "A core interest. I've stored several documents and links related to this."}
+                        {selectedNode.type === 'CONTENT' && "Information extracted from your recent conversations."}
+                     </>
+                   )}
                  </p>
                </div>
 
                {/* Metrics */}
                <div className="grid grid-cols-2 gap-4">
                   <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                    <div className="text-[10px] text-gray-500 uppercase font-mono mb-1">Relevance</div>
+                    <div className="text-[10px] text-gray-500 uppercase font-mono mb-1">Importance</div>
                     <div className="text-xl font-mono text-white">{selectedNode.val * 8}%</div>
                   </div>
                   <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                    <div className="text-[10px] text-gray-500 uppercase font-mono mb-1">Last Active</div>
-                    <div className="text-xl font-mono text-white">2h ago</div>
+                    <div className="text-[10px] text-gray-500 uppercase font-mono mb-1">Recency</div>
+                    <div className="text-xl font-mono text-white">Active</div>
                   </div>
                </div>
 
@@ -220,7 +224,7 @@ export const KnowledgeGraph: React.FC = () => {
                <div className="space-y-3">
                  <div className="flex items-center gap-2 text-gray-400 text-xs font-mono uppercase tracking-wider">
                    <Network className="w-4 h-4" />
-                   <span>Linked Nodes</span>
+                   <span>Memory Threads</span>
                  </div>
                  <div className="space-y-2">
                     {getConnections(selectedNode.id).map((neighbor: any) => (
@@ -247,21 +251,42 @@ export const KnowledgeGraph: React.FC = () => {
             <div className="p-6 border-t border-white/5 bg-navy-950/50 space-y-3">
                <button className="w-full py-3 rounded-xl bg-neon-blue/10 border border-neon-blue/50 text-neon-blue hover:bg-neon-blue hover:text-white transition-all text-xs font-mono uppercase tracking-widest flex items-center justify-center gap-2">
                  <Activity className="w-4 h-4" />
-                 Deep Analysis
+                 Explore Deeply
                </button>
-               <div className="flex gap-3">
-                  <button className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-gray-400 hover:text-white transition-all flex items-center justify-center gap-2">
-                    <Share2 className="w-4 h-4" />
-                  </button>
-                  <button className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-gray-400 hover:text-white transition-all flex items-center justify-center gap-2">
-                    <ExternalLink className="w-4 h-4" />
-                  </button>
-                  <button className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-gray-400 hover:text-white transition-all flex items-center justify-center gap-2">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
-               </div>
             </div>
           </>
+        ) : (
+          /* Default Insight Panel View */
+          <div className="h-full flex flex-col p-8 items-center justify-center text-center space-y-8 animate-in fade-in duration-700">
+             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-neon-blue/10 to-neon-purple/10 border border-white/5 flex items-center justify-center relative">
+                <div className="absolute inset-0 rounded-full border border-neon-blue/20 animate-spin-slow"></div>
+                <Brain className="w-10 h-10 text-white/50" />
+             </div>
+             
+             <div className="space-y-4">
+                <h2 className="text-2xl font-light text-white">Your Second Brain</h2>
+                <p className="text-sm text-gray-400 leading-relaxed font-light">
+                  I connect the dots between your conversations, habits, and ideas. Select any node to explore how I remember you.
+                </p>
+             </div>
+
+             <div className="grid grid-cols-1 gap-4 w-full text-left">
+                <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                   <div className="flex items-center gap-3 mb-1">
+                      <Sparkles className="w-4 h-4 text-neon-cyan" />
+                      <span className="text-xs font-mono uppercase tracking-wider text-white">Synthesizing</span>
+                   </div>
+                   <div className="text-xs text-gray-500">I group related concepts to help you learn faster.</div>
+                </div>
+                <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                   <div className="flex items-center gap-3 mb-1">
+                      <Lightbulb className="w-4 h-4 text-neon-purple" />
+                      <span className="text-xs font-mono uppercase tracking-wider text-white">Recalling</span>
+                   </div>
+                   <div className="text-xs text-gray-500">I bring up past details when they matter most.</div>
+                </div>
+             </div>
+          </div>
         )}
       </div>
     </div>

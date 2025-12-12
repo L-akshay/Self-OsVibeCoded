@@ -61,29 +61,49 @@ class GeminiService {
   // 1. Chat with Thinking Mode & Search
   async chatWithThinking(
     prompt: string, 
-    imagePart?: { data: string, mimeType: string }
+    imagePart?: { data: string, mimeType: string },
+    history?: { role: 'user' | 'model', content: string }[]
   ): Promise<{ text: string, thinking?: string, grounding?: string[] }> {
     
     // Determine model based on complexity. 
     // Using gemini-3-pro-preview for logic/reasoning.
     const modelId = 'gemini-3-pro-preview';
 
-    const parts: any[] = [];
+    // Construct conversation history
+    const contents: any[] = [];
+    
+    if (history && history.length > 0) {
+      history.forEach(msg => {
+        contents.push({
+          role: msg.role,
+          parts: [{ text: msg.content }]
+        });
+      });
+    }
+
+    const currentParts: any[] = [];
     if (imagePart) {
-      parts.push({
+      currentParts.push({
         inlineData: {
           mimeType: imagePart.mimeType,
           data: imagePart.data
         }
       });
     }
-    parts.push({ text: prompt });
+    currentParts.push({ text: prompt });
+    
+    // Add current prompt
+    contents.push({
+      role: 'user',
+      parts: currentParts
+    });
 
     try {
       const response = await ai.models.generateContent({
         model: modelId,
-        contents: { parts },
+        contents: contents,
         config: {
+          systemInstruction: "You are SELF-OS, a deeply empathetic, intelligent, and supportive companion. You act as a best friend and a wise guidance provider. Your goal is to help the user grow, organize their thoughts, and find clarity. You are witty, warm, and personal. Do not sound robotic. Engage in natural conversation, ask follow-up questions, and show genuine interest in the user's life.",
           thinkingConfig: { thinkingBudget: 1024 }, // Enable thinking
           tools: [{ googleSearch: {} }] // Enable Grounding
         }
@@ -97,8 +117,7 @@ class GeminiService {
         .map((c: any) => c.web?.uri)
         .filter((u: string) => !!u);
         
-      // Extract thinking trace if available (implementation detail depends on final API exposure of thought chain)
-      // Currently simulation or checking specific candidate parts
+      // Extract thinking trace if available
       const thinking = (response.candidates?.[0]?.content?.parts as any[])?.find(p => p.thought)?.thought || undefined;
 
       return { text, thinking, grounding: groundingUrls };
@@ -110,13 +129,13 @@ class GeminiService {
   }
 
   // 2. Image Editing (Nano Banana)
-  async editImage(base64Image: string, prompt: string): Promise<string | null> {
+  async editImage(base64Image: string, prompt: string, mimeType: string = 'image/png'): Promise<string | null> {
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image', // Nano Banana / Flash Image
         contents: {
           parts: [
-            { inlineData: { mimeType: 'image/png', data: base64Image } },
+            { inlineData: { mimeType: mimeType, data: base64Image } },
             { text: prompt }
           ]
         }
@@ -243,7 +262,7 @@ class GeminiService {
       },
       config: {
         responseModalities: [Modality.AUDIO],
-        systemInstruction: "You are SELF-OS, a helpful, witty, and highly intelligent operating system avatar.",
+        systemInstruction: "You are SELF-OS, a warm, supportive, and witty vocal companion. You are not just a tool; you are a friend and a guide. Listen actively to the user, offer wise advice, and be empathetic. Speak naturally with varied intonation, like a real person.",
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
         }
@@ -287,6 +306,42 @@ class GeminiService {
       console.error("Mind map generation error", e);
       return null;
     }
+  }
+
+  // 7. Expand specific node in Strategy Map
+  async expandStrategyNode(nodeName: string, contextGoal: string): Promise<any[]> {
+    try {
+      const prompt = `The user is breaking down the goal: "${contextGoal}".
+      They want to expand the specific step: "${nodeName}".
+      Provide 3-4 actionable sub-steps for "${nodeName}".
+      Return JSON only: { "children": [ { "name": "Sub-step 1" }, ... ] }`;
+
+       const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: prompt,
+        config: { responseMimeType: 'application/json' }
+      });
+
+      const json = JSON.parse(response.text || "{}");
+      return json.children || [];
+    } catch (e) {
+      console.error("Expansion error", e);
+      return [];
+    }
+  }
+
+  // 8. Generate Chat Suggestions
+  async generateSuggestions(lastMessage: string): Promise<string[]> {
+    const prompt = `Given the last AI response: "${lastMessage}", suggest 3 short, relevant follow-up user responses or questions (max 6 words each).
+    Return JSON only: { "suggestions": ["...", "...", "..."] }`;
+    try {
+      const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+          config: { responseMimeType: 'application/json' }
+      });
+      return JSON.parse(response.text || "{}").suggestions || [];
+    } catch { return []; }
   }
 }
 

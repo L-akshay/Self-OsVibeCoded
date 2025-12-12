@@ -2,23 +2,42 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Image as ImageIcon, Loader2, Sparkles, BrainCircuit, Search, X, Bot, User, ArrowUp, Cpu } from 'lucide-react';
 import { geminiService } from '../services/gemini';
 import { Message, AiIdentity } from '../types';
+import { db } from '../services/db';
 
 interface ChatInterfaceProps {
   identity: AiIdentity;
+  onInteraction: (type: 'CHAT') => void;
+  userId: string;
 }
 
-export const ChatInterface: React.FC<ChatInterfaceProps> = ({ identity }) => {
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({ identity, onInteraction, userId }) => {
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'model', content: `Hello Explorer. I am ${identity.name}. I'm ready to think, plan, and create with you.`, timestamp: Date.now() }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{ file: File, preview: string } | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Load history on mount
+  useEffect(() => {
+    const history = db.getChats(userId);
+    if (history.length > 0) {
+      setMessages(history);
+    } else {
+      // Default greeting if empty
+      setMessages([{
+        id: '1', 
+        role: 'model', 
+        content: `Hello. I am ${identity.name}. I'm here as your friend and guide. How can I help you today?`, 
+        timestamp: Date.now() 
+      }]);
+    }
+  }, [userId, identity.name]);
+
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  useEffect(scrollToBottom, [messages, isThinking]);
+  useEffect(scrollToBottom, [messages, isThinking, suggestions]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -39,46 +58,72 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ identity }) => {
     }
   };
 
-  const handleSend = async () => {
-    if ((!input.trim() && !selectedImage) || isThinking) return;
+  const handleSend = async (textOverride?: string) => {
+    const textToSend = textOverride || input;
+    if ((!textToSend.trim() && !selectedImage) || isThinking) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input,
+      content: textToSend,
       imageUrl: selectedImage?.preview,
       timestamp: Date.now()
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => {
+        const next = [...prev, userMsg];
+        db.saveChats(userId, next); // Persist
+        return next;
+    });
+
     setInput('');
     const imagePayload = selectedImage ? { data: selectedImage.preview.split(',')[1], mimeType: selectedImage.file.type } : undefined;
     setSelectedImage(null);
+    setSuggestions([]); 
     setIsThinking(true);
+    onInteraction('CHAT'); 
 
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
+    // Prepare history for API (filter valid roles)
+    const historyForApi = messages
+      .filter(m => m.role === 'user' || m.role === 'model')
+      .map(m => ({ role: m.role as 'user' | 'model', content: m.content }));
+
     try {
-      if (imagePayload && (input.toLowerCase().includes('add') || input.toLowerCase().includes('remove') || input.toLowerCase().includes('filter'))) {
-         const editedImage = await geminiService.editImage(imagePayload.data, input);
-         setMessages(prev => [...prev, {
+      if (imagePayload && (textToSend.toLowerCase().includes('add') || textToSend.toLowerCase().includes('remove') || textToSend.toLowerCase().includes('filter'))) {
+         const editedImage = await geminiService.editImage(imagePayload.data, textToSend);
+         const aiMsg: Message = {
              id: Date.now().toString(),
              role: 'model',
              content: editedImage ? "Here is the edited version." : "I couldn't edit the image.",
              imageUrl: editedImage || undefined,
              timestamp: Date.now()
-         }]);
+         };
+         setMessages(prev => {
+             const next = [...prev, aiMsg];
+             db.saveChats(userId, next);
+             return next;
+         });
       } else {
-        const response = await geminiService.chatWithThinking(userMsg.content, imagePayload);
-        
-        setMessages(prev => [...prev, {
+        const response = await geminiService.chatWithThinking(userMsg.content, imagePayload, historyForApi);
+        const aiMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: 'model',
           content: response.text,
           thinking: response.thinking,
           groundingUrls: response.grounding,
           timestamp: Date.now()
-        }]);
+        };
+        
+        setMessages(prev => {
+            const next = [...prev, aiMsg];
+            db.saveChats(userId, next);
+            return next;
+        });
+
+        // Generate suggestions in background
+        geminiService.generateSuggestions(response.text).then(suggs => setSuggestions(suggs));
       }
     } catch (e) {
       console.error(e);
@@ -95,8 +140,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ identity }) => {
 
   return (
     <div className="flex flex-col h-full relative w-full mx-auto">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 pt-6 pb-32 custom-scrollbar scroll-smooth">
+      {/* Messages Area - Flex Grow to take available space */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-8 custom-scrollbar scroll-smooth">
         {messages.map((msg, idx) => (
           <div key={msg.id} className={`flex gap-6 ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group animate-in slide-in-from-bottom-4 fade-in duration-500`}>
             
@@ -202,9 +247,25 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ identity }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="absolute bottom-6 left-0 right-0 px-4 sm:px-8 flex justify-center z-20">
-        <div className="w-full max-w-4xl relative group">
+      {/* Input Area Container - Fixed at bottom of flex column */}
+      <div className="w-full px-4 sm:px-8 pb-6 pt-4 bg-gradient-to-t from-navy-950 via-navy-950 to-transparent z-20">
+        
+        {/* Suggestions */}
+        {suggestions.length > 0 && !isThinking && (
+           <div className="flex flex-wrap justify-center gap-2 mb-3 animate-in slide-in-from-bottom-2 fade-in duration-500">
+             {suggestions.map((sugg, i) => (
+               <button 
+                 key={i} 
+                 onClick={() => handleSend(sugg)}
+                 className="px-3 py-1.5 rounded-full bg-navy-800/80 border border-neon-blue/30 hover:bg-neon-blue/20 hover:border-neon-blue text-[10px] md:text-xs text-neon-blue transition-all backdrop-blur-md shadow-lg"
+               >
+                 {sugg}
+               </button>
+             ))}
+           </div>
+        )}
+
+        <div className="w-full max-w-4xl mx-auto relative group">
           
           {/* Active Image Attachment Indicator */}
           {selectedImage && (
@@ -245,7 +306,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ identity }) => {
             />
 
             <button 
-              onClick={handleSend}
+              onClick={() => handleSend()}
               disabled={(!input.trim() && !selectedImage) || isThinking}
               className="p-3 rounded-xl bg-neon-blue text-white shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed hover:bg-blue-600 hover:scale-105 transition-all shrink-0">
               {isThinking ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowUp className="w-5 h-5" />}
@@ -255,4 +316,4 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ identity }) => {
       </div>
     </div>
   );
-};
+}

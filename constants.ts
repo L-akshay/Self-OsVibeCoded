@@ -1,3 +1,4 @@
+
 export const APP_NAME = "SELF-OS";
 
 export const AGENT_PROMPTS = {
@@ -14,19 +15,20 @@ export const AGENT_PROMPTS = {
 
 export const MOCK_GRAPH_DATA = {
   nodes: [
-    { id: 'productivity', label: 'Productivity', type: 'TOPIC', val: 10 },
-    { id: 'react', label: 'React.js', type: 'TOPIC', val: 8 },
-    { id: 'gemini', label: 'Gemini API', type: 'TOPIC', val: 12 },
-    { id: 'fitness', label: 'Fitness', type: 'HABIT', val: 6 },
-    { id: 'alice', label: 'Alice', type: 'PERSON', val: 5 },
-    { id: 'meeting', label: 'Strategy Meeting', type: 'CONTENT', val: 4 },
+    { id: 'productivity', label: 'Deep Work', type: 'TOPIC', val: 12, description: "Your core focus state. We've linked this to morning routines and noise-canceling playlists." },
+    { id: 'react', label: 'Creative Coding', type: 'TOPIC', val: 8, description: "The intersection of art and logic. You asked me to remind you to 'play' with code more often." },
+    { id: 'gemini', label: 'AI Ethics', type: 'TOPIC', val: 10, description: "A recurring theme in our late-night chats. You're concerned about agency and alignment." },
+    { id: 'fitness', label: 'Morning Run', type: 'HABIT', val: 6, description: "The foundation of your energy levels. Consistency has been at 80% this week." },
+    { id: 'alice', label: 'Alice (Partner)', type: 'PERSON', val: 7, description: "Your primary collaborator. I track project ideas and meeting notes shared with her." },
+    { id: 'launch', label: 'Product Launch', type: 'CONTENT', val: 5, description: "The big goal for Q3. Linked to several tasks and strategy maps." },
   ] as any[],
   links: [
     { source: 'productivity', target: 'gemini' },
     { source: 'react', target: 'gemini' },
     { source: 'productivity', target: 'fitness' },
-    { source: 'alice', target: 'meeting' },
-    { source: 'meeting', target: 'productivity' },
+    { source: 'alice', target: 'launch' },
+    { source: 'launch', target: 'productivity' },
+    { source: 'react', target: 'launch' },
   ] as any[]
 };
 

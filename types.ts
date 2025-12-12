@@ -7,7 +7,8 @@ export enum ViewMode {
   LIVE_SESSION = 'LIVE_SESSION',
   SETTINGS = 'SETTINGS',
   AVATAR_STUDIO = 'AVATAR_STUDIO',
-  STRATEGY_MAP = 'STRATEGY_MAP'
+  STRATEGY_MAP = 'STRATEGY_MAP',
+  WORKFLOWS = 'WORKFLOWS'
 }
 
 export enum AgentType {
@@ -15,6 +16,17 @@ export enum AgentType {
   PLANNER = 'PLANNER',
   REFLECTOR = 'REFLECTOR',
   CHAT = 'CHAT'
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  password?: string; // In a real app, this would be hashed on server. Stored locally for simulation.
+  avatarUrl: string | null;
+  xp: number;
+  level: number;
+  createdAt: number;
 }
 
 export interface AiIdentity {
@@ -29,6 +41,7 @@ export interface Task {
   status: 'INBOX' | 'TODAY' | 'NEXT' | 'BACKLOG' | 'DONE';
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
   tags: string[];
+  userId?: string;
 }
 
 export interface GraphNode {
@@ -36,6 +49,7 @@ export interface GraphNode {
   label: string;
   type: 'TOPIC' | 'PERSON' | 'CONTENT' | 'HABIT';
   val: number; // For visualization sizing
+  description?: string; // Context for the memory
 }
 
 export interface GraphLink {
